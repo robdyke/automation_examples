@@ -1,0 +1,5 @@
+*~
+clouds.yaml
+.vagrant*
+.vagrant*/
+demo-key*

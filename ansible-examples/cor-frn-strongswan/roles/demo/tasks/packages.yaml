@@ -1,0 +1,19 @@
+- name: joe
+  package:
+      name: joe
+      state: present
+
+- name: tcpdump
+  package:
+      name: tcpdump
+      state: present
+
+- name: strace
+  package:
+      name: strace
+      state: present
+
+- name: netcat
+  package:
+      name: nmap-ncat
+      state: present

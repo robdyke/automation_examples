@@ -1,0 +1,122 @@
+- name: Set up networking
+  hosts: localhost
+  tags:
+      - networking
+      - ips
+  vars:
+      - state: present
+  tasks:
+      - include: tasks/network.yaml
+      - include: tasks/router.yaml
+      - include: tasks/secgroups.yaml
+      - include: tasks/ports.yaml
+
+- name: Create bastion hosts
+  tags: 
+      - dmz
+      - gatewayed
+  hosts: localhost
+  vars:
+      - state: present
+  vars_files: 
+      - vars/cloud-vars.yaml
+  tasks:
+      - include: tasks/bastions.yaml
+
+- name: Waiting for bastions to settle
+  gather_facts: false
+  tags:
+      - dmz
+  hosts: dmz
+  tasks:
+      - name: Wait for system to become reachable
+        wait_for_connection:
+          timeout: 900
+
+- name: Configure bastions
+  become: true
+  tags: 
+      - dmz
+  hosts: dmz
+  vars:
+      - state: present
+  vars_files: 
+      - vars/cloud-vars.yaml
+  roles:
+      - role: demo
+      - role: bastion
+      
+- name: Setup strongswan (FRN)
+  become: true
+  tags:
+      - vpn
+      - dmz
+  hosts: frn-host-dmz
+  vars_files:
+      - vars/cloud-vars.yaml
+  vars:
+      state: present
+  roles:
+      - role: strongswan
+  pre_tasks:
+      - name: Wait 600 seconds for target connection to become reachable/usable
+        wait_for_connection:
+  
+- name: Setup strongswan (COR)
+  become: true
+  tags:
+      - vpn
+      - dmz
+  hosts: cor-host-dmz
+  vars_files:
+      - vars/cloud-vars.yaml
+  vars:
+      state: present
+  roles:
+      - role: strongswan
+  pre_tasks:
+      - name: Wait 600 seconds for target connection to become reachable/usable
+        wait_for_connection:
+  
+- name: Create gatewayed hosts
+  hosts: localhost
+  tags:
+      - gatewayed
+  tasks:
+      - include: tasks/hosts.yaml
+  vars_files: 
+      - vars/cloud-vars.yaml
+  vars:
+      state: present      
+
+- name: Waiting for bastions to settle
+  gather_facts: false
+  tags:
+      - gatewayed
+  hosts: gatewayed
+  tasks:
+      - name: Wait for systems to become reachable
+        wait_for_connection:
+          timeout: 900
+
+- name: Configure gatewayed hosts
+  tags:
+      - gatewayed
+  hosts: gatewayed
+  become: true
+  vars_files: 
+      - vars/cloud-vars.yaml
+  roles:
+      - role: demo
+  pre_tasks:
+      - name: Wait 600 seconds for target connection to become reachable/usable
+        wait_for_connection:
+  
+- name: Set up routes
+  tags:
+      - networking
+  hosts: localhost
+  tasks:
+      - include: tasks/routes.yaml
+  vars:
+      state: present

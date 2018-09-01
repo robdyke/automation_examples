@@ -1,0 +1,12 @@
+*~
+clouds.yaml
+.vagrant*
+.vagrant*/
+demo-key*
+*tf_state*
+.terraform/
+*retry
+image.gz
+snapshot-demo-key*
+crash.log
+vars/s3.yaml
