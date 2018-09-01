@@ -93,21 +93,6 @@ resource "openstack_networking_secgroup_rule_v2" "local_http_rule_1" {
   security_group_id = "${openstack_networking_secgroup_v2.local_http.id}"
 }
 
-resource "openstack_networking_secgroup_v2" "local_mysql" {
-  name = "Internal MySQL Access"
-  description = "Allow MySQL access from local VMs"
-}
-
-resource "openstack_networking_secgroup_rule_v2" "local_mysql_rule_1" {
-  direction = "ingress"
-  ethertype = "IPv4"
-  protocol = "tcp"
-  port_range_min = 3306
-  port_range_max = 3306
-  remote_ip_prefix = "${var.DMZ_Subnet}"
-  security_group_id = "${openstack_networking_secgroup_v2.local_mysql.id}"
-}
-
 resource "openstack_compute_keypair_v2" "ssh-keypair" {
   name       = "terraform-keypair"
   public_key = "${var.SSH_KEY}"
@@ -139,33 +124,16 @@ resource "openstack_compute_floatingip_associate_v2" "jumpbox_ip" {
   instance_id = "${openstack_compute_instance_v2.jumpbox.id}"
 }
 
-resource "openstack_compute_instance_v2" "loadbalancer" {
-  name        = "haproxy01"
-  image_name  = "${var.IMAGE_NAME}"
-  flavor_name = "${var.INSTANCE_TYPE}"
-  key_pair    = "${openstack_compute_keypair_v2.ssh-keypair.name}"
-  security_groups = ["${openstack_networking_secgroup_v2.local_ssh.name}",
-                     "${openstack_networking_secgroup_v2.any_http.name}"]
-  network {
-    name = "${openstack_networking_network_v2.dmz.name}"
-  }
-}
-
-resource "openstack_compute_floatingip_associate_v2" "loadbalancer_ip" {
-  floating_ip = "${openstack_compute_floatingip_v2.loadbalancer_ip.address}"
-  instance_id = "${openstack_compute_instance_v2.loadbalancer.id}"
-}
-
-resource "openstack_compute_servergroup_v2" "webservers" {
-  name = "webserver-servergroup"
+resource "openstack_compute_servergroup_v2" "nodes" {
+  name = "nodes-servergroup"
   policies = ["anti-affinity"]
   # policies = ["affinity"]
 }
 
-resource "openstack_compute_instance_v2" "web" {
-  name        = "${format("web%02d", count.index + 1)}"
+resource "openstack_compute_instance_v2" "node" {
+  name        = "${format("node%02d", count.index + 1)}"
   image_name  = "${var.IMAGE_NAME}"
-  flavor_name = "${var.WEB_INSTANCE_TYPE}"
+  flavor_name = "${var.NODE_INSTANCE_TYPE}"
   key_pair    = "${openstack_compute_keypair_v2.ssh-keypair.name}"
   security_groups = ["${openstack_networking_secgroup_v2.local_ssh.name}",
                      "${openstack_networking_secgroup_v2.local_http.name}"]
@@ -173,52 +141,7 @@ resource "openstack_compute_instance_v2" "web" {
     name = "${openstack_networking_network_v2.dmz.name}"
   }
 
-  scheduler_hints = { group = "${openstack_compute_servergroup_v2.webservers.id}" }
+  scheduler_hints = { group = "${openstack_compute_servergroup_v2.nodes.id}" }
 
-  count = 2
-}
-
-resource "openstack_blockstorage_volume_v2" "db_system" {
-  region = ""
-  name = "db_system"
-  description = "System volume for MySQL"
-  size = 30
-  image_id = "${var.IMAGE_ID}"
-
-}
-
-resource "openstack_blockstorage_volume_v2" "db_data" {
-  region = ""
-  name = "db_data"
-  description = "data volume for MySQL"
-  size = 50
-}
-
-resource "openstack_compute_instance_v2" "database" {
-  name            = "db01"
-  flavor_name     = "${var.DB_INSTANCE_TYPE}"
-  key_pair        = "${openstack_compute_keypair_v2.ssh-keypair.name}"
-  security_groups = ["${openstack_networking_secgroup_v2.local_ssh.name}",
-                     "${openstack_networking_secgroup_v2.local_mysql.name}"]
-
-  block_device {
-    uuid = "${openstack_blockstorage_volume_v2.db_system.id}"
-    source_type = "volume"
-    boot_index = 0
-    volume_size = "${openstack_blockstorage_volume_v2.db_system.size}"
-    destination_type = "volume"
-    delete_on_termination = true
-  }
-
-  block_device {
-    uuid = "${openstack_blockstorage_volume_v2.db_data.id}"
-    source_type = "volume"
-    boot_index = 1
-    destination_type = "volume"
-    delete_on_termination = false
-  }
-
-  network {
-    name = "${openstack_networking_network_v2.dmz.name}"
-  }
+  count = 4
 }
